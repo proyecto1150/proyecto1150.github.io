@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1923" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="P-11.50" />
+  <meta name="description" content="GPX trail tracker with live GPS and Strava comparison" />
+  <link rel="manifest" href="manifest.json" />
+  <!-- Icon: replace icon/icon.jpg with your uploaded file -->
+  <link rel="apple-touch-icon" href="icon/icon.jpg" />
+  <link rel="icon" type="image/jpeg" href="icon/icon.jpg" />
+
+  <!-- Leaflet (CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Firebase Realtime DB (live tracking) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <title>P-11.50</title>
+
+  <style>
+/* ============================================================
+   TrailMate — All CSS inlined for reliable GitHub Pages loading
+   ============================================================ */
+:root {
+  --bg:#0f1923; --bg2:#162030; --bg3:#1e2d3d; --bg4:#243445;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+  --text:#e8edf2; --text2:#6e8399; --text3:#4a6070;
+  --green:#4ade80; --green-dim:rgba(74,222,128,0.12);
+  --orange:#f97316; --strava:#FC4C02; --blue:#38bdf8; --red:#f87171; --yellow:#fbbf24;
+  --panel-h:280px; --topbar-h:52px; --elev-h:90px; --radius:10px;
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+
+/* Splash */
+.splash{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.splash.hidden{display:none!important}
+.splash-inner{text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.splash-logo{width:96px;height:96px;border-radius:50%;overflow:hidden;border:3px solid var(--green);box-shadow:0 0 32px rgba(74,222,128,.4);animation:pulse 2.6s ease-in-out infinite}
+.splash-logo img{width:100%;height:100%;object-fit:cover}
+@keyframes pulse{0%,100%{box-shadow:0 0 16px rgba(74,222,128,.3)}50%{box-shadow:0 0 40px rgba(74,222,128,.7)}}
+.splash-title{font-size:2.4rem;font-weight:800;letter-spacing:-.03em;background:linear-gradient(135deg,#fff 30%,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.splash-sub{font-family:var(--mono);font-size:.78rem;color:var(--text2);letter-spacing:.18em}
+.btn-primary{background:var(--green);color:#081a0f;border:none;border-radius:var(--radius);padding:12px 28px;font-family:var(--sans);font-weight:700;font-size:.9rem;cursor:pointer;transition:opacity .2s}
+.btn-primary:active{opacity:.82}
+
+/* App shell */
+.app{display:flex;flex-direction:column;height:100vh}
+.app.hidden{display:none!important}
+
+/* Topbar */
+.topbar{height:var(--topbar-h);background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 12px;padding-top:env(safe-area-inset-top);flex-shrink:0;z-index:500;gap:8px}
+.topbar-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.topbar-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.logo-img{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--green);flex-shrink:0}
+
+/* Search */
+.search-wrap{flex:1;min-width:0;position:relative}
+.search-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-family:var(--sans);font-size:.82rem;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--blue)}
+.search-input::placeholder{color:var(--text3)}
+.search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);z-index:600;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.search-result-item{padding:9px 12px;cursor:pointer;font-size:.8rem;border-bottom:1px solid var(--border);transition:background .15s}
+.search-result-item:last-child{border-bottom:none}
+.search-result-item:hover{background:var(--bg3)}
+.search-result-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-result-sub{font-size:.7rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* GPS badge */
+.gps-badge{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:20px;font-family:var(--mono);font-size:.67rem;border:1px solid;transition:all .3s;white-space:nowrap}
+.gps-off{border-color:var(--text3);color:var(--text3)}
+.gps-searching{border-color:var(--orange);color:var(--orange)}
+.gps-on{border-color:var(--green);color:var(--green)}
+.gps-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.gps-searching .gps-dot{animation:blink .7s step-end infinite}
+.gps-on .gps-dot{animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
+/* Off-route */
+.off-route-alert{display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:20px;border:1px solid var(--yellow);color:var(--yellow);font-family:var(--mono);font-size:.66rem;font-weight:600;animation:pulseY 1.4s ease-in-out infinite}
+@keyframes pulseY{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* Recording */
+.rec-indicator{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;border:1px solid var(--red);color:var(--red);font-family:var(--mono);font-size:.67rem}
+.rec-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:blink .8s step-end infinite}
+
+/* Map */
+#map{flex:1;z-index:1;min-height:0}
+.leaflet-control-zoom a{background:var(--bg2)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-control-attribution{background:rgba(10,18,28,.75)!important;color:var(--text3)!important;font-size:8px!important}
+
+/* Elevation panel */
+.elev-panel{height:var(--elev-h);background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;z-index:99;display:flex;flex-direction:column}
+.elev-panel.hidden{display:none!important}
+.elev-panel-header{display:flex;align-items:center;gap:8px;padding:4px 12px;flex-shrink:0}
+.elev-panel-title{font-family:var(--mono);font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)}
+.elev-stats{font-family:var(--mono);font-size:.68rem;color:var(--green);flex:1;text-align:right}
+.elev-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:.8rem;padding:2px 5px}
+.elev-canvas-wrap{flex:1;min-height:0;padding:0 8px 4px}
+.elev-canvas-wrap canvas{width:100%;height:100%;display:block}
+
+/* Bottom panel */
+.bottom-panel{height:var(--panel-h);background:var(--bg2);border-top:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding-bottom:env(safe-area-inset-bottom);z-index:100;transition:height .12s ease;user-select:none}
+.drag-handle{height:20px;display:flex;align-items:center;justify-content:center;cursor:ns-resize;flex-shrink:0;touch-action:none}
+.drag-bar{width:36px;height:4px;background:var(--border2);border-radius:2px;transition:background .2s}
+.drag-handle:hover .drag-bar,.drag-handle:active .drag-bar{background:var(--text3)}
+
+/* Tabs */
+.tab-nav{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.tab-nav::-webkit-scrollbar{display:none}
+.tab-btn{flex-shrink:0;padding:9px 11px;border:none;background:none;color:var(--text2);font-family:var(--sans);font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;position:relative;transition:color .2s;white-space:nowrap}
+.tab-btn::after{content:'';position:absolute;bottom:-1px;left:15%;right:15%;height:2px;background:var(--green);border-radius:2px;transform:scaleX(0);transition:transform .22s}
+.tab-btn.active{color:var(--text)}
+.tab-btn.active::after{transform:scaleX(1)}
+.tab-pane{display:none;flex:1;overflow-y:auto;padding:10px 14px}
+.tab-pane.active{display:block}
+
+/* Buttons */
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;font-family:var(--sans);font-size:.78rem;cursor:pointer;transition:color .2s,border-color .2s;display:inline-flex;align-items:center;gap:5px}
+.btn-ghost:hover{color:var(--text);border-color:var(--text2)}
+.btn-ghost.danger{color:var(--red)}
+.btn-ghost.danger:hover{border-color:var(--red)}
+.btn-strava{width:100%;background:var(--strava);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-family:var(--sans);font-weight:700;font-size:.88rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px}
+.btn-gps-track{width:100%;margin-top:10px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;font-family:var(--sans);font-weight:600;font-size:.84rem;cursor:pointer;transition:background .2s}
+.btn-gps-track:hover{background:var(--bg4)}
+.btn-gps-track.active{border-color:var(--orange);color:var(--orange)}
+.upload-btn-small{font-family:var(--sans);font-size:.72rem;font-weight:600;color:var(--text2);cursor:pointer;padding:4px 8px;border:1px dashed var(--border2);border-radius:6px;transition:color .2s;white-space:nowrap;background:none}
+.upload-btn-small:hover{color:var(--text)}
+
+/* Section labels */
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.section-label{font-family:var(--mono);font-size:.67rem;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);flex:1}
+
+/* Pre-loaded trails */
+.preloaded-list{display:flex;flex-direction:column;gap:5px}
+.preloaded-item{display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s,background .2s}
+.preloaded-item:hover{background:var(--bg4);border-color:var(--border2)}
+.preloaded-item.active{border-color:var(--green);background:var(--green-dim)}
+.preloaded-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.preloaded-info{flex:1;min-width:0}
+.preloaded-name{font-size:.82rem;font-weight:600}
+.preloaded-meta{font-family:var(--mono);font-size:.67rem;color:var(--text2);margin-top:1px}
+.preloaded-badge{font-family:var(--mono);font-size:.63rem;padding:2px 7px;border-radius:4px;background:var(--bg4);color:var(--text3);white-space:nowrap}
+.preloaded-item.active .preloaded-badge{background:var(--green);color:#081a0f;font-weight:700}
+.route-list{display:flex;flex-direction:column;gap:5px}
+.route-item{display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:8px 11px;border:1px solid var(--border)}
+.route-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.route-info{flex:1;min-width:0}
+.route-name{font-size:.8rem;font-weight:600}
+.route-meta{font-family:var(--mono);font-size:.67rem;color:var(--text2)}
+.route-actions{display:flex;gap:4px}
+.route-actions button{background:none;border:none;cursor:pointer;padding:3px 5px;color:var(--text3);font-size:.75rem;border-radius:4px;transition:color .2s}
+.route-actions button:hover{color:var(--text)}
+
+/* Pins */
+.pin-mode-note{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue);margin-bottom:10px;text-align:center}
+.waypoint-list{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.waypoint-item{display:flex;align-items:flex-start;gap:8px;background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border);cursor:pointer}
+.waypoint-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+.waypoint-info{flex:1;min-width:0}
+.waypoint-name{font-size:.8rem;font-weight:600}
+.waypoint-note{font-size:.72rem;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.waypoint-actions button{background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 4px;transition:color .2s}
+.waypoint-actions button:hover{color:var(--red)}
+
+/* Recorder */
+.rec-status-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.rec-status-icon{font-size:1.6rem;opacity:.5}
+.rec-status-title{font-size:.88rem;font-weight:700}
+.rec-status-sub{font-size:.75rem;color:var(--text2);margin-top:2px}
+.btn-rec-start{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius);padding:12px;font-family:var(--sans);font-weight:700;font-size:.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s}
+.btn-rec-start::before{content:'';width:12px;height:12px;border-radius:50%;background:#fff;opacity:.9}
+.btn-rec-stop{background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:9px 16px;font-family:var(--sans);font-weight:700;font-size:.84rem;cursor:pointer}
+.rec-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.rec-live-stat{background:var(--bg3);border-radius:8px;padding:9px 11px}
+.rec-live-val{font-family:var(--mono);font-size:1.2rem}
+.rec-live-lbl{font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-top:1px}
+.rec-action-row{display:flex;gap:8px}
+.rec-done-header{font-size:.9rem;font-weight:700;color:var(--green);margin-bottom:10px}
+.rec-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rec-summary-item{background:var(--bg3);border-radius:8px;padding:8px 10px}
+.rec-summary-val{font-family:var(--mono);font-size:.95rem}
+.rec-summary-lbl{font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:.07em}
+
+/* Info rows */
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.info-val{font-family:var(--mono);font-size:.8rem}
+.ellipsis{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+
+/* Strava */
+.strava-header{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.strava-icon{width:30px;height:30px;flex-shrink:0}
+.strava-title{font-size:.9rem;font-weight:700}
+.strava-sub{font-size:.72rem;color:var(--text2)}
+.strava-avatar{width:32px;height:32px;border-radius:50%;border:2px solid var(--strava)}
+.strava-connect-desc{font-size:.8rem;color:var(--text2);line-height:1.5;margin-bottom:12px}
+.strava-config-details{border:1px solid var(--border);border-radius:var(--radius)}
+.strava-config-details summary{padding:9px 12px;cursor:pointer;font-size:.78rem;color:var(--text2);list-style:none}
+.strava-config-details[open] summary{border-bottom:1px solid var(--border)}
+.config-fields{padding:12px;display:flex;flex-direction:column;gap:8px}
+.config-label{display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.config-input{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:.78rem;outline:none;width:100%}
+.config-input:focus{border-color:var(--blue)}
+.config-hint{font-size:.67rem;color:var(--text3);margin-top:2px;line-height:1.4}
+.activity-list{display:flex;flex-direction:column;gap:5px}
+.activity-item{display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s,background .2s}
+.activity-item:hover{background:var(--bg4);border-color:var(--border2)}
+.activity-item.active{border-color:var(--strava)}
+.activity-type-icon{font-size:1.1rem;flex-shrink:0}
+.activity-info{flex:1;min-width:0}
+.activity-name{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.activity-meta{font-family:var(--mono);font-size:.67rem;color:var(--text2);margin-top:1px}
+.strava-overlay-info{border-top:1px solid var(--border);padding-top:10px}
+.gh-notice{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:10px 12px;margin-bottom:4px}
+.gh-notice-title{font-size:.78rem;font-weight:700;color:var(--blue);margin-bottom:4px}
+.gh-notice-body{font-size:.72rem;color:var(--text2);line-height:1.55}
+.gh-notice-body code{font-family:var(--mono);background:var(--bg4);padding:1px 5px;border-radius:3px;color:var(--text)}
+.gh-notice-link{display:inline-block;margin-top:5px;color:var(--blue);font-size:.72rem;text-decoration:none}
+
+/* Compare */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.compare-col{background:var(--bg3);border-radius:var(--radius);padding:9px 10px}
+.compare-col-label{display:flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot-gpx{background:var(--green)}
+.dot-strava{background:var(--strava)}
+.diff-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:8px;padding:8px 11px;margin-bottom:5px}
+.diff-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.diff-val{font-family:var(--mono);font-size:.85rem;color:var(--blue)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px}
+.stat-card{background:var(--bg3);border-radius:var(--radius);padding:9px 11px;border:1px solid var(--border)}
+.stat-label{font-size:.63rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+.stat-val{font-family:var(--mono);font-size:1.2rem;color:var(--text);line-height:1.2}
+.stat-unit{font-family:var(--mono);font-size:.62rem;color:var(--text3)}
+.coords-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:8px;padding:7px 11px;margin-bottom:5px}
+.mono{font-family:var(--mono);font-size:.7rem}
+
+/* Empty state */
+.empty-state{text-align:center;color:var(--text2);font-size:.82rem;line-height:1.6}
+.empty-state strong{color:var(--text)}
+.empty-icon{font-size:2rem;margin-bottom:8px}
+
+/* FAB group */
+.fab-group{position:fixed;right:14px;display:flex;flex-direction:column;gap:8px;z-index:200;transition:bottom .12s ease}
+.fab{width:42px;height:42px;border-radius:50%;background:var(--bg2);border:1px solid var(--border2);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.45);transition:transform .2s}
+.fab:active{transform:scale(.9)}
+.fab.fab-center{border-color:var(--orange);color:var(--orange)}
+
+/* Toast */
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(8px);background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 16px;font-size:.8rem;opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;white-space:nowrap;z-index:9000}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Countdown ── */
+.countdown-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:16px;padding:16px 28px}
+.countdown-label{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--green);opacity:.8}
+.countdown-grid{display:flex;align-items:center;gap:4px}
+.cd-unit{display:flex;flex-direction:column;align-items:center;min-width:52px}
+.cd-val{font-family:var(--mono);font-size:2rem;font-weight:500;color:#fff;line-height:1;letter-spacing:.04em}
+.cd-lbl{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text2);margin-top:3px}
+.cd-sep{font-family:var(--mono);font-size:1.6rem;color:var(--green);opacity:.6;line-height:1;padding-bottom:12px;align-self:flex-start;margin-top:4px}
+.countdown-date{font-family:var(--mono);font-size:.68rem;color:var(--text2);letter-spacing:.1em}
+.cd-done{font-family:var(--mono);font-size:1rem;color:var(--green);text-align:center;padding:4px 0}
+
+/* GPS marker */
+.user-marker{width:20px;height:20px;border-radius:50%;background:var(--orange);border:3px solid #fff;box-shadow:0 0 0 3px rgba(249,115,22,.3),0 2px 6px rgba(0,0,0,.5)}
+
+/* Recording — platform note + gap segment badge */
+.rec-platform-note{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:7px}
+.rec-note-row{display:flex;align-items:flex-start;gap:8px;font-size:.75rem;color:var(--text2);line-height:1.5}
+.rec-note-icon{flex-shrink:0;font-size:.9rem}
+.rec-note-row strong{color:var(--text)}
+.rec-segments-badge{font-family:var(--mono);font-size:.7rem;color:var(--yellow);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);border-radius:6px;padding:5px 10px;margin-bottom:8px;text-align:center}
+
+/* ── Live Tracking ── */
+.tab-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:4px;vertical-align:middle;animation:blink .9s step-end infinite}
+.live-hero{text-align:center;padding:12px 0 16px}
+.live-hero-icon{font-size:2rem;margin-bottom:6px}
+.live-hero-title{font-size:1rem;font-weight:700;margin-bottom:4px}
+.live-hero-sub{font-size:.78rem;color:var(--text2);line-height:1.5}
+.live-config-details{border:1px solid var(--border);border-radius:var(--radius);margin-top:10px}
+.live-config-details summary{padding:9px 12px;cursor:pointer;font-size:.78rem;color:var(--text2);list-style:none}
+.live-config-details[open] summary{border-bottom:1px solid var(--border)}
+.live-section{margin-bottom:12px}
+.live-divider{height:1px;background:var(--border);margin:14px 0}
+.live-hiker-card,.live-viewer-card{background:var(--bg3);border-radius:var(--radius);padding:12px;border:1px solid var(--border)}
+.live-hiker-status{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.live-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.live-dot-off{background:var(--text3)}
+.live-dot-live{background:var(--green);box-shadow:0 0 0 3px rgba(74,222,128,.25);animation:blink 1.4s ease-in-out infinite}
+.live-dot-stopped{background:var(--yellow)}
+.live-hiker-status-text{font-size:.85rem;font-weight:600}
+.live-hiker-hint{font-size:.73rem;color:var(--text2);margin-bottom:10px;line-height:1.4}
+.btn-live-share{width:100%;background:var(--green);color:#081a0f;border:none;border-radius:var(--radius);padding:11px;font-family:var(--sans);font-weight:700;font-size:.86rem;cursor:pointer;transition:opacity .2s}
+.btn-live-share:active{opacity:.82}
+.btn-live-share.sharing{background:var(--red);color:#fff}
+.live-viewer-empty{text-align:center;padding:14px 0;font-size:.8rem;color:var(--text2)}
+.live-viewer-empty .empty-icon{font-size:1.8rem;margin-bottom:6px}
+.live-last-update-ago{font-size:.68rem;color:var(--text3);font-family:var(--mono)}
+
+/* Hiker dot on map */
+.hiker-dot{position:relative}
+.hiker-dot-inner{width:18px;height:18px;border-radius:50%;background:var(--green);border:3px solid #fff;box-shadow:0 0 0 3px rgba(74,222,128,.3),0 2px 8px rgba(0,0,0,.5)}
+.hiker-dot-pulse{position:absolute;top:-6px;left:-6px;width:30px;height:30px;border-radius:50%;background:rgba(74,222,128,.2);animation:hikerPulse 2s ease-out infinite}
+@keyframes hikerPulse{0%{transform:scale(.7);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+
+/* Live viewer badge in topbar */
+.live-viewer-badge{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.06em}
+.live-dot-badge{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink .9s step-end infinite}
+
+/* Live FAB */
+.fab-live{border-color:var(--green)!important;color:var(--green)!important;font-size:.95rem}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+.hidden{display:none!important}
+  </style>
+</head>
+<body>
+
+<!-- Splash -->
+<div id="splash" class="splash">
+  <div class="splash-inner">
+    <div class="splash-logo">
+      <img src="icon/icon.jpg" alt="P-11.50" />
+    </div>
+    <h1 class="splash-title">P-11.50</h1>
+    <p class="splash-sub">GPX · GPS · Strava</p>
+
+    <!-- Countdown -->
+    <div class="countdown-wrap">
+      <div class="countdown-label">Start in</div>
+      <div class="countdown-grid">
+        <div class="cd-unit"><span class="cd-val" id="cdDays">--</span><span class="cd-lbl">days</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><span class="cd-val" id="cdHours">--</span><span class="cd-lbl">hrs</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><span class="cd-val" id="cdMins">--</span><span class="cd-lbl">min</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><span class="cd-val" id="cdSecs">--</span><span class="cd-lbl">sec</span></div>
+      </div>
+      <div class="countdown-date">9 May 2026 · 09:00</div>
+    </div>
+
+    <button id="splashEnter" class="btn-primary">Open App</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <img src="icon/icon.jpg" alt="" class="logo-img" />
+      <div class="search-wrap" id="searchWrap">
+        <input id="searchInput" class="search-input" type="search" placeholder="Search place…" autocomplete="off" />
+        <div id="searchResults" class="search-results hidden"></div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div id="liveViewerBadge" class="live-viewer-badge hidden" title="Live tracking active">
+        <span class="live-dot-badge"></span>LIVE
+      </div>
+      <div id="offRouteAlert" class="off-route-alert hidden">⚠ Off Route</div>
+      <div id="recIndicator" class="rec-indicator hidden">
+        <span class="rec-dot"></span>
+        <span id="recElapsedBadge" class="rec-time">0:00</span>
+      </div>
+      <div id="gpsStatus" class="gps-badge gps-off">
+        <span class="gps-dot"></span>
+        <span class="gps-label">GPS</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <div id="elevPanel" class="elev-panel hidden">
+    <div class="elev-panel-header">
+      <span class="elev-panel-title">Elevation Profile</span>
+      <span id="elevStats" class="elev-stats"></span>
+      <button id="btnCloseElev" class="elev-close">✕</button>
+    </div>
+    <div class="elev-canvas-wrap"><canvas id="elevCanvas"></canvas></div>
+  </div>
+
+  <div class="bottom-panel" id="bottomPanel">
+    <div class="drag-handle" id="dragHandle"><div class="drag-bar"></div></div>
+
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="routes">Routes</button>
+      <button class="tab-btn" data-tab="live">
+        <span class="tab-live-dot hidden" id="tabLiveDot"></span>Live
+      </button>
+      <button class="tab-btn" data-tab="pins">Pins</button>
+      <button class="tab-btn" data-tab="record">Record</button>
+      <button class="tab-btn" data-tab="strava">Strava</button>
+      <button class="tab-btn" data-tab="compare">Compare</button>
+      <button class="tab-btn" data-tab="stats">Stats</button>
+    </div>
+
+    <!-- ROUTES -->
+    <div class="tab-pane active" id="tab-routes">
+      <div class="section-header">
+        <span class="section-label">Pre-loaded Trails</span>
+        <label class="upload-btn-small" for="gpxUpload">+ Upload GPX</label>
+        <input type="file" id="gpxUpload" accept=".gpx" hidden />
+      </div>
+      <div id="preloadedList" class="preloaded-list"></div>
+      <div id="activeRoutesSection" class="hidden">
+        <div class="section-label" style="margin-top:10px">Active on Map</div>
+        <div id="routeList" class="route-list"></div>
+      </div>
+      <button id="btnGPS" class="btn-gps-track">📍 Track My Position</button>
+    </div>
+
+    <!-- LIVE TRACKING -->
+    <div class="tab-pane" id="tab-live">
+
+      <!-- Hiker controls -->
+      <div class="live-section">
+        <div class="section-label">I am the hiker</div>
+        <div class="live-hiker-card" id="liveHikerCard">
+          <div class="live-hiker-status" id="liveHikerStatus">
+            <span class="live-status-dot live-dot-off"></span>
+            <span id="liveHikerStatusText">Not sharing</span>
+          </div>
+          <div class="live-hiker-hint" id="liveHikerHint">Enable GPS tracking first, then start sharing.</div>
+          <button id="btnLiveShare" class="btn-live-share">📡 Start Sharing Location</button>
+        </div>
+      </div>
+
+      <div class="live-divider"></div>
+
+      <!-- Viewer panel — everyone sees this -->
+      <div class="live-section">
+        <div class="section-label">Hiker position</div>
+        <div class="live-viewer-card">
+          <div id="livePosInfo">
+            <div class="info-row"><span class="info-label">Status</span><span id="liveStatus" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Last update</span><span id="liveLastUpdate" class="info-val mono">—</span></div>
+            <div class="info-row"><span class="info-label">Altitude</span><span id="liveAlt" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Speed</span><span id="liveSpeed" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Accuracy</span><span id="liveAcc" class="info-val">—</span></div>
+          </div>
+          <button id="btnJumpToHiker" class="btn-ghost" style="width:100%;margin-top:8px" disabled>🎯 Jump to hiker on map</button>
+        </div>
+      </div>
+
+    </div><!-- /tab-live -->
+    <div class="tab-pane" id="tab-pins">
+      <div class="section-header">
+        <span class="section-label">Waypoints</span>
+        <button id="btnAddPin" class="upload-btn-small">📌 Drop Pin</button>
+      </div>
+      <div id="pinModeNote" class="pin-mode-note hidden">Tap anywhere on the map to place a pin</div>
+      <div id="routeWaypointsSection" class="hidden">
+        <div class="section-label">Route Waypoints</div>
+        <div id="routeWaypointList" class="waypoint-list"></div>
+      </div>
+      <div id="customPinsSection">
+        <div id="customPinList" class="waypoint-list"></div>
+        <div id="noPinsMsg" class="empty-state" style="padding:16px 0">
+          <div class="empty-icon">📍</div>
+          <p>Tap <strong>Drop Pin</strong> then tap the map to add waypoints.</p>
+        </div>
+      </div>
+      <div id="pinExportRow" class="hidden" style="margin-top:8px">
+        <button id="btnExportPins" class="btn-ghost" style="width:100%">⬇ Export pins as GPX</button>
+      </div>
+    </div>
+
+    <!-- RECORD -->
+    <div class="tab-pane" id="tab-record">
+      <div id="recReady">
+        <div class="rec-status-row">
+          <div class="rec-status-icon">⏺</div>
+          <div>
+            <div class="rec-status-title">Record a Track</div>
+            <div class="rec-status-sub">Enable GPS tracking first, then start.</div>
+          </div>
+        </div>
+        <div class="rec-platform-note">
+          <div class="rec-note-row"><span class="rec-note-icon">🤖</span><span><strong>Android:</strong> GPS records in the background — you can turn the screen off freely.</span></div>
+          <div class="rec-note-row"><span class="rec-note-icon">🍎</span><span><strong>iOS:</strong> Keep the app open and screen on. If the screen turns off, gaps are saved as separate track segments in the GPX.</span></div>
+        </div>
+        <button id="btnRecStart" class="btn-rec-start">Start Recording</button>
+      </div>
+      <div id="recActive" class="hidden">
+        <div class="rec-live-grid">
+          <div class="rec-live-stat"><div class="rec-live-val" id="recDist">0.00</div><div class="rec-live-lbl">km</div></div>
+          <div class="rec-live-stat"><div class="rec-live-val" id="recTime">0:00</div><div class="rec-live-lbl">elapsed</div></div>
+          <div class="rec-live-stat"><div class="rec-live-val" id="recSpeed">0.0</div><div class="rec-live-lbl">km/h avg</div></div>
+          <div class="rec-live-stat"><div class="rec-live-val" id="recGain">0</div><div class="rec-live-lbl">m gain</div></div>
+        </div>
+        <div id="recSegments" class="rec-segments-badge" style="display:none"></div>
+        <div class="rec-action-row">
+          <button id="btnRecStop" class="btn-rec-stop">⏹ Stop</button>
+          <button id="btnRecFit" class="btn-ghost">🎯 Fit</button>
+        </div>
+      </div>
+      <div id="recDone" class="hidden">
+        <div class="rec-done-header">Track recorded ✓</div>
+        <div id="recSummary" class="rec-summary-grid"></div>
+        <div class="rec-action-row" style="margin-top:10px">
+          <button id="btnRecDownload" class="btn-primary">⬇ Export GPX</button>
+          <button id="btnRecDiscard" class="btn-ghost danger">Discard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRAVA -->
+    <div class="tab-pane" id="tab-strava">
+      <div class="strava-header">
+        <svg viewBox="0 0 40 40" fill="none" class="strava-icon">
+          <path d="M16 5 L24 22 L20 22 L28 35" stroke="#FC4C02" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div style="flex:1">
+          <div class="strava-title">Strava</div>
+          <div class="strava-sub" id="stravaAuthStatus">Not connected</div>
+        </div>
+        <img id="stravaAvatar" class="strava-avatar hidden" src="" alt="" />
+      </div>
+      <div id="stravaConnect">
+        <p class="strava-connect-desc">Connect Strava to load your real activities onto the topo map.</p>
+        <button id="btnStravaLogin" class="btn-strava">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+          Connect with Strava
+        </button>
+        <details class="strava-config-details" id="stravaConfigDetails">
+          <summary>⚙️ API Configuration</summary>
+          <div class="config-fields">
+            <div class="gh-notice">
+              <div class="gh-notice-title">📌 GitHub Pages Setup</div>
+              <div class="gh-notice-body">Deploy <code>cloudflare-worker.js</code> to Cloudflare Workers (free), then paste its URL below. <a href="README-GITHUB.md" target="_blank" class="gh-notice-link">Full instructions →</a></div>
+            </div>
+            <label class="config-label">Client ID<input id="stravaClientId" type="text" inputmode="numeric" placeholder="123456" class="config-input" /></label>
+            <label class="config-label">Client Secret<input id="stravaClientSecret" type="password" placeholder="••••••••" class="config-input" /></label>
+            <label class="config-label">Redirect URI<input id="stravaRedirectUri" type="url" class="config-input" /><span class="config-hint">Must exactly match the URL in your Strava app settings</span></label>
+            <label class="config-label">Proxy URL (Cloudflare Worker)<input id="stravaProxyUrl" type="url" placeholder="https://strava-proxy.yourname.workers.dev" class="config-input" /><span class="config-hint">Deploy cloudflare-worker.js → paste worker URL here</span></label>
+            <button id="btnSaveStravaConfig" class="btn-ghost" style="margin-top:8px;width:100%">Save &amp; Connect →</button>
+          </div>
+        </details>
+      </div>
+      <div id="stravaConnected" class="hidden">
+        <div class="panel-row" style="margin-bottom:6px">
+          <button id="btnStravaRefresh" class="btn-ghost">↻ Refresh</button>
+          <button id="btnStravaLogout" class="btn-ghost danger">Disconnect</button>
+        </div>
+        <div id="activityList" class="activity-list"></div>
+      </div>
+      <div id="stravaOverlayInfo" class="strava-overlay-info hidden">
+        <div class="section-label" style="margin-top:10px">Loaded on map</div>
+        <div class="info-row"><span class="info-label">Activity</span><span id="stravaName" class="info-val ellipsis">—</span></div>
+        <div class="info-row"><span class="info-label">Distance</span><span id="stravaDist" class="info-val">—</span></div>
+        <div class="info-row"><span class="info-label">Elev ↑</span><span id="stravaElev" class="info-val">—</span></div>
+        <div class="info-row"><span class="info-label">Time</span><span id="stravaTime" class="info-val">—</span></div>
+        <button id="btnClearStrava" class="btn-ghost danger" style="margin-top:8px;width:100%">✕ Remove overlay</button>
+      </div>
+    </div>
+
+    <!-- COMPARE -->
+    <div class="tab-pane" id="tab-compare">
+      <div id="compareEmpty" class="empty-state">
+        <div class="empty-icon">⛰</div>
+        <p>Load a <strong>GPX route</strong> and a <strong>Strava activity</strong> to compare them.</p>
+      </div>
+      <div id="comparePanel" class="hidden">
+        <div class="compare-grid">
+          <div class="compare-col"><div class="compare-col-label"><span class="dot dot-gpx"></span> GPX Route</div>
+            <div class="info-row"><span class="info-label">Distance</span><span id="cmpGpxDist" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Elev ↑</span><span id="cmpGpxElev" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Points</span><span id="cmpGpxPts" class="info-val">—</span></div>
+          </div>
+          <div class="compare-col"><div class="compare-col-label"><span class="dot dot-strava"></span> Strava</div>
+            <div class="info-row"><span class="info-label">Distance</span><span id="cmpStravaDist" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Elev ↑</span><span id="cmpStravaElev" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Points</span><span id="cmpStravaPts" class="info-val">—</span></div>
+          </div>
+        </div>
+        <div class="diff-row"><span class="diff-label">Δ Distance</span><span id="diffDist" class="diff-val">—</span></div>
+        <div class="diff-row"><span class="diff-label">Δ Elevation</span><span id="diffElev" class="diff-val">—</span></div>
+        <button id="btnFitBoth" class="btn-primary" style="margin-top:10px;width:100%">Fit both on map</button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="tab-pane" id="tab-stats">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Speed</div><div class="stat-val" id="statSpeed">—</div><div class="stat-unit">km/h</div></div>
+        <div class="stat-card"><div class="stat-label">Altitude</div><div class="stat-val" id="statAlt">—</div><div class="stat-unit">m asl</div></div>
+        <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-val" id="statAcc">—</div><div class="stat-unit">m</div></div>
+        <div class="stat-card"><div class="stat-label">Off Route</div><div class="stat-val" id="statOffRoute">—</div><div class="stat-unit">m</div></div>
+      </div>
+      <div class="coords-row"><span class="info-label">Position</span><span id="statCoords" class="mono">—</span></div>
+      <div class="coords-row"><span class="info-label">Heading / Fixes</span><span id="statHeadFixes" class="mono">—</span></div>
+    </div>
+
+  </div><!-- /bottom-panel -->
+
+  <div class="fab-group" id="fabGroup">
+    <button id="btnJumpHikerFab" class="fab fab-live hidden" title="Jump to hiker">📡</button>
+    <button id="btnCenter" class="fab fab-center hidden" title="Center on position">◎</button>
+    <button id="btnElev"   class="fab"                   title="Elevation profile">📈</button>
+    <button id="btnLayer"  class="fab"                   title="Cycle map layer">🗻</button>
+  </div>
+
+</div><!-- /app -->
+
+<div id="toast" class="toast"></div>
+
+<script src="js/routes.js"></script>
+<script src="js/strava.js"></script>
+<script src="js/elevation.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/waypoints.js"></script>
+<script src="js/geocoder.js"></script>
+<script src="js/livetrack.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+/* ── Splash countdown to 9 May 2026 09:00 local time ── */
+(function() {
+  // Target: 9 May 2026 at 09:00 in the user's local timezone
+  const TARGET = new Date(2026, 4, 9, 9, 0, 0); // month is 0-indexed: 4 = May
+
+  const dEl = document.getElementById('cdDays');
+  const hEl = document.getElementById('cdHours');
+  const mEl = document.getElementById('cdMins');
+  const sEl = document.getElementById('cdSecs');
+  const wrap = document.querySelector('.countdown-wrap');
+
+  function pad(n) { return String(Math.max(0, n)).padStart(2, '0'); }
+
+  function tick() {
+    const diff = TARGET - Date.now();
+
+    if (diff <= 0) {
+      // Countdown finished — we've started!
+      wrap.innerHTML = '<div class="cd-done">🏔 The adventure has begun!</div>';
+      return;
+    }
+
+    const totalSec = Math.floor(diff / 1000);
+    const days  = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins  = Math.floor((totalSec % 3600) / 60);
+    const secs  = totalSec % 60;
+
+    dEl.textContent = pad(days);
+    hEl.textContent = pad(hours);
+    mEl.textContent = pad(mins);
+    sEl.textContent = pad(secs);
+  }
+
+  tick(); // run immediately so there's no blank flash
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
