@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1923" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="P-11.50" />
+  <meta name="description" content="GPX trail tracker with live GPS and Strava comparison" />
+  <link rel="manifest" href="manifest.json" />
+  <!-- Icon: replace icon/icon.jpg with your uploaded file -->
+  <link rel="apple-touch-icon" href="icon/icon.jpg" />
+  <link rel="icon" type="image/jpeg" href="icon/icon.jpg" />
+
+  <!-- Leaflet (CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Firebase Realtime DB (live tracking) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <title>P-11.50</title>
+
+  <style>
+/* ============================================================
+   TrailMate — All CSS inlined for reliable GitHub Pages loading
+   ============================================================ */
+:root {
+  --bg:#0f1923; --bg2:#162030; --bg3:#1e2d3d; --bg4:#243445;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+  --text:#e8edf2; --text2:#6e8399; --text3:#4a6070;
+  --green:#4ade80; --green-dim:rgba(74,222,128,0.12);
+  --orange:#f97316; --strava:#0437F2; --blue:#38bdf8; --red:#f87171; --yellow:#fbbf24;
+  --panel-h:280px; --topbar-h:52px; --elev-h:90px; --radius:10px;
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+
+/* Splash */
+.splash{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.splash.hidden{display:none!important}
+.splash-inner{text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.splash-logo{width:96px;height:96px;border-radius:50%;overflow:hidden;border:3px solid var(--green);box-shadow:0 0 32px rgba(74,222,128,.4);animation:pulse 2.6s ease-in-out infinite}
+.splash-logo img{width:100%;height:100%;object-fit:cover}
+@keyframes pulse{0%,100%{box-shadow:0 0 16px rgba(74,222,128,.3)}50%{box-shadow:0 0 40px rgba(74,222,128,.7)}}
+.splash-title{font-size:2.4rem;font-weight:800;letter-spacing:-.03em;background:linear-gradient(135deg,#fff 30%,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.splash-sub{font-family:var(--mono);font-size:.78rem;color:var(--text2);letter-spacing:.18em}
+.btn-primary{background:var(--green);color:#081a0f;border:none;border-radius:var(--radius);padding:12px 28px;font-family:var(--sans);font-weight:700;font-size:.9rem;cursor:pointer;transition:opacity .2s}
+.btn-primary:active{opacity:.82}
+
+/* App shell */
+.app{display:flex;flex-direction:column;height:100vh}
+.app.hidden{display:none!important}
+
+/* Topbar */
+.topbar{height:var(--topbar-h);background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 12px;padding-top:env(safe-area-inset-top);flex-shrink:0;z-index:500;gap:8px}
+.topbar-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.topbar-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.logo-img{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--green);flex-shrink:0}
+
+/* Search */
+.search-wrap{flex:1;min-width:0;position:relative}
+.search-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-family:var(--sans);font-size:.82rem;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--blue)}
+.search-input::placeholder{color:var(--text3)}
+.search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);z-index:600;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.search-result-item{padding:9px 12px;cursor:pointer;font-size:.8rem;border-bottom:1px solid var(--border);transition:background .15s}
+.search-result-item:last-child{border-bottom:none}
+.search-result-item:hover{background:var(--bg3)}
+.search-result-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-result-sub{font-size:.7rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* GPS badge */
+.gps-badge{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:20px;font-family:var(--mono);font-size:.67rem;border:1px solid;transition:all .3s;white-space:nowrap}
+.gps-off{border-color:var(--text3);color:var(--text3)}
+.gps-searching{border-color:var(--orange);color:var(--orange)}
+.gps-on{border-color:var(--green);color:var(--green)}
+.gps-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.gps-searching .gps-dot{animation:blink .7s step-end infinite}
+.gps-on .gps-dot{animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
+/* Off-route */
+.off-route-alert{display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:20px;border:1px solid var(--yellow);color:var(--yellow);font-family:var(--mono);font-size:.66rem;font-weight:600;animation:pulseY 1.4s ease-in-out infinite}
+@keyframes pulseY{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* Recording */
+.rec-indicator{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;border:1px solid var(--red);color:var(--red);font-family:var(--mono);font-size:.67rem}
+.rec-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:blink .8s step-end infinite}
+
+/* Map */
+#map{flex:1;z-index:1;min-height:0}
+.leaflet-control-zoom a{background:var(--bg2)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-control-attribution{background:rgba(10,18,28,.75)!important;color:var(--text3)!important;font-size:8px!important}
+
+/* Elevation panel */
+.elev-panel{height:var(--elev-h);background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;z-index:99;display:flex;flex-direction:column}
+.elev-panel.hidden{display:none!important}
+.elev-panel-header{display:flex;align-items:center;gap:8px;padding:4px 12px;flex-shrink:0}
+.elev-panel-title{font-family:var(--mono);font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)}
+.elev-stats{font-family:var(--mono);font-size:.68rem;color:var(--green);flex:1;text-align:right}
+.elev-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:.8rem;padding:2px 5px}
+.elev-canvas-wrap{flex:1;min-height:0;padding:0 8px 4px}
+.elev-canvas-wrap canvas{width:100%;height:100%;display:block}
+
+/* Bottom panel */
+.bottom-panel{height:var(--panel-h);background:var(--bg2);border-top:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding-bottom:env(safe-area-inset-bottom);z-index:100;transition:height .12s ease;user-select:none}
+.drag-handle{height:20px;display:flex;align-items:center;justify-content:center;cursor:ns-resize;flex-shrink:0;touch-action:none}
+.drag-bar{width:36px;height:4px;background:var(--border2);border-radius:2px;transition:background .2s}
+.drag-handle:hover .drag-bar,.drag-handle:active .drag-bar{background:var(--text3)}
+
+/* Tabs */
+.tab-nav{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.tab-nav::-webkit-scrollbar{display:none}
+.tab-btn{flex-shrink:0;padding:9px 11px;border:none;background:none;color:var(--text2);font-family:var(--sans);font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;position:relative;transition:color .2s;white-space:nowrap}
+.tab-btn::after{content:'';position:absolute;bottom:-1px;left:15%;right:15%;height:2px;background:var(--green);border-radius:2px;transform:scaleX(0);transition:transform .22s}
+.tab-btn.active{color:var(--text)}
+.tab-btn.active::after{transform:scaleX(1)}
+.tab-pane{display:none;flex:1;overflow-y:auto;padding:10px 14px}
+.tab-pane.active{display:block}
+
+/* Buttons */
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;font-family:var(--sans);font-size:.78rem;cursor:pointer;transition:color .2s,border-color .2s;display:inline-flex;align-items:center;gap:5px}
+.btn-ghost:hover{color:var(--text);border-color:var(--text2)}
+.btn-ghost.danger{color:var(--red)}
+.btn-ghost.danger:hover{border-color:var(--red)}
+.btn-strava{width:100%;background:var(--strava);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-family:var(--sans);font-weight:700;font-size:.88rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px}
+.btn-gps-track{width:100%;margin-top:10px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:10px;font-family:var(--sans);font-weight:600;font-size:.84rem;cursor:pointer;transition:background .2s}
+.btn-gps-track:hover{background:var(--bg4)}
+.btn-gps-track.active{border-color:var(--orange);color:var(--orange)}
+.upload-btn-small{font-family:var(--sans);font-size:.72rem;font-weight:600;color:var(--text2);cursor:pointer;padding:4px 8px;border:1px dashed var(--border2);border-radius:6px;transition:color .2s;white-space:nowrap;background:none}
+.upload-btn-small:hover{color:var(--text)}
+
+/* Section labels */
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.section-label{font-family:var(--mono);font-size:.67rem;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);flex:1}
+
+/* Pre-loaded trails */
+.preloaded-list{display:flex;flex-direction:column;gap:5px}
+.preloaded-item{display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s,background .2s}
+.preloaded-item:hover{background:var(--bg4);border-color:var(--border2)}
+.preloaded-item.active{border-color:var(--green);background:var(--green-dim)}
+.preloaded-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.preloaded-info{flex:1;min-width:0}
+.preloaded-name{font-size:.82rem;font-weight:600}
+.preloaded-meta{font-family:var(--mono);font-size:.67rem;color:var(--text2);margin-top:1px}
+.preloaded-badge{font-family:var(--mono);font-size:.63rem;padding:2px 7px;border-radius:4px;background:var(--bg4);color:var(--text3);white-space:nowrap}
+.preloaded-item.active .preloaded-badge{background:var(--green);color:#081a0f;font-weight:700}
+.route-list{display:flex;flex-direction:column;gap:5px}
+.route-item{display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:8px 11px;border:1px solid var(--border)}
+.route-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.route-info{flex:1;min-width:0}
+.route-name{font-size:.8rem;font-weight:600}
+.route-meta{font-family:var(--mono);font-size:.67rem;color:var(--text2)}
+.route-actions{display:flex;gap:4px}
+.route-actions button{background:none;border:none;cursor:pointer;padding:3px 5px;color:var(--text3);font-size:.75rem;border-radius:4px;transition:color .2s}
+.route-actions button:hover{color:var(--text)}
+
+/* Pins */
+.pin-mode-note{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--blue);margin-bottom:10px;text-align:center}
+.waypoint-list{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.waypoint-item{display:flex;align-items:flex-start;gap:8px;background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border);cursor:pointer}
+.waypoint-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+.waypoint-info{flex:1;min-width:0}
+.waypoint-name{font-size:.8rem;font-weight:600}
+.waypoint-note{font-size:.72rem;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.waypoint-actions button{background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 4px;transition:color .2s}
+.waypoint-actions button:hover{color:var(--red)}
+
+/* Recorder */
+.rec-status-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.rec-status-icon{font-size:1.6rem;opacity:.5}
+.rec-status-title{font-size:.88rem;font-weight:700}
+.rec-status-sub{font-size:.75rem;color:var(--text2);margin-top:2px}
+.btn-rec-start{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius);padding:12px;font-family:var(--sans);font-weight:700;font-size:.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s}
+.btn-rec-start::before{content:'';width:12px;height:12px;border-radius:50%;background:#fff;opacity:.9}
+.btn-rec-stop{background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:9px 16px;font-family:var(--sans);font-weight:700;font-size:.84rem;cursor:pointer}
+.rec-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.rec-live-stat{background:var(--bg3);border-radius:8px;padding:9px 11px}
+.rec-live-val{font-family:var(--mono);font-size:1.2rem}
+.rec-live-lbl{font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-top:1px}
+.rec-action-row{display:flex;gap:8px}
+.rec-done-header{font-size:.9rem;font-weight:700;color:var(--green);margin-bottom:10px}
+.rec-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rec-summary-item{background:var(--bg3);border-radius:8px;padding:8px 10px}
+.rec-summary-val{font-family:var(--mono);font-size:.95rem}
+.rec-summary-lbl{font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:.07em}
+
+/* Info rows */
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.info-val{font-family:var(--mono);font-size:.8rem}
+.ellipsis{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+
+/* Strava */
+.strava-header{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.strava-icon{width:30px;height:30px;flex-shrink:0}
+.strava-title{font-size:.9rem;font-weight:700}
+.strava-sub{font-size:.72rem;color:var(--text2)}
+.strava-avatar{width:32px;height:32px;border-radius:50%;border:2px solid var(--strava)}
+.strava-connect-desc{font-size:.8rem;color:var(--text2);line-height:1.5;margin-bottom:12px}
+.strava-config-details{border:1px solid var(--border);border-radius:var(--radius)}
+.strava-config-details summary{padding:9px 12px;cursor:pointer;font-size:.78rem;color:var(--text2);list-style:none}
+.strava-config-details[open] summary{border-bottom:1px solid var(--border)}
+.config-fields{padding:12px;display:flex;flex-direction:column;gap:8px}
+.config-label{display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.config-input{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:.78rem;outline:none;width:100%}
+.config-input:focus{border-color:var(--blue)}
+.config-hint{font-size:.67rem;color:var(--text3);margin-top:2px;line-height:1.4}
+.activity-list{display:flex;flex-direction:column;gap:5px}
+.activity-item{display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s,background .2s}
+.activity-item:hover{background:var(--bg4);border-color:var(--border2)}
+.activity-item.active{border-color:var(--strava)}
+.activity-share-btn{flex-shrink:0;background:var(--bg4);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-family:var(--sans);font-size:.7rem;font-weight:700;padding:5px 9px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.activity-share-btn:hover{background:#0437F2;border-color:#0437F2;color:#fff}
+.activity-share-btn.shared{background:rgba(4,55,242,.15);border-color:#0437F2;color:#0437F2}
+.activity-share-btn.shared:hover{background:#0437F2;color:#fff}
+.activity-share-btn:disabled{opacity:.5;cursor:not-allowed}
+.activity-type-icon{font-size:1.1rem;flex-shrink:0}
+.activity-info{flex:1;min-width:0}
+.activity-name{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.activity-meta{font-family:var(--mono);font-size:.67rem;color:var(--text2);margin-top:1px}
+.strava-overlay-info{border-top:1px solid var(--border);padding-top:10px}
+.gh-notice{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:10px 12px;margin-bottom:4px}
+.gh-notice-title{font-size:.78rem;font-weight:700;color:var(--blue);margin-bottom:4px}
+.gh-notice-body{font-size:.72rem;color:var(--text2);line-height:1.55}
+.gh-notice-body code{font-family:var(--mono);background:var(--bg4);padding:1px 5px;border-radius:3px;color:var(--text)}
+.gh-notice-link{display:inline-block;margin-top:5px;color:var(--blue);font-size:.72rem;text-decoration:none}
+
+/* Compare */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.compare-col{background:var(--bg3);border-radius:var(--radius);padding:9px 10px}
+.compare-col-label{display:flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot-gpx{background:var(--green)}
+.dot-strava{background:var(--strava)}
+.diff-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:8px;padding:8px 11px;margin-bottom:5px}
+.diff-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.diff-val{font-family:var(--mono);font-size:.85rem;color:var(--blue)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px}
+.stat-card{background:var(--bg3);border-radius:var(--radius);padding:9px 11px;border:1px solid var(--border)}
+.stat-label{font-size:.63rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+.stat-val{font-family:var(--mono);font-size:1.2rem;color:var(--text);line-height:1.2}
+.stat-unit{font-family:var(--mono);font-size:.62rem;color:var(--text3)}
+.coords-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:8px;padding:7px 11px;margin-bottom:5px}
+.mono{font-family:var(--mono);font-size:.7rem}
+
+/* Empty state */
+.empty-state{text-align:center;color:var(--text2);font-size:.82rem;line-height:1.6}
+.empty-state strong{color:var(--text)}
+.empty-icon{font-size:2rem;margin-bottom:8px}
+
+/* FAB group */
+.fab-group{position:fixed;right:14px;display:flex;flex-direction:column;gap:8px;z-index:200;transition:bottom .12s ease}
+.fab{width:42px;height:42px;border-radius:50%;background:var(--bg2);border:1px solid var(--border2);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.45);transition:transform .2s}
+.fab:active{transform:scale(.9)}
+.fab.fab-center{border-color:var(--orange);color:var(--orange)}
+
+/* Toast */
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(8px);background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 16px;font-size:.8rem;opacity:0;pointer-events:none;transition:opacity .22s,transform .22s;white-space:nowrap;z-index:9000}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Countdown ── */
+.countdown-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:16px;padding:16px 28px}
+.countdown-label{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--green);opacity:.8}
+.countdown-grid{display:flex;align-items:center;gap:4px}
+.cd-unit{display:flex;flex-direction:column;align-items:center;min-width:52px}
+.cd-val{font-family:var(--mono);font-size:2rem;font-weight:500;color:#fff;line-height:1;letter-spacing:.04em}
+.cd-lbl{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text2);margin-top:3px}
+.cd-sep{font-family:var(--mono);font-size:1.6rem;color:var(--green);opacity:.6;line-height:1;padding-bottom:12px;align-self:flex-start;margin-top:4px}
+.countdown-date{font-family:var(--mono);font-size:.68rem;color:var(--text2);letter-spacing:.1em}
+.cd-done{font-family:var(--mono);font-size:1rem;color:var(--green);text-align:center;padding:4px 0}
+
+/* GPS marker */
+.user-marker{width:20px;height:20px;border-radius:50%;background:var(--orange);border:3px solid #fff;box-shadow:0 0 0 3px rgba(249,115,22,.3),0 2px 6px rgba(0,0,0,.5)}
+
+/* Recording — platform note + gap segment badge */
+.rec-platform-note{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:7px}
+.rec-note-row{display:flex;align-items:flex-start;gap:8px;font-size:.75rem;color:var(--text2);line-height:1.5}
+.rec-note-icon{flex-shrink:0;font-size:.9rem}
+.rec-note-row strong{color:var(--text)}
+.rec-segments-badge{font-family:var(--mono);font-size:.7rem;color:var(--yellow);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);border-radius:6px;padding:5px 10px;margin-bottom:8px;text-align:center}
+
+/* ── Live Tracking ── */
+.tab-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:4px;vertical-align:middle;animation:blink .9s step-end infinite}
+.live-hero{text-align:center;padding:12px 0 16px}
+.live-hero-icon{font-size:2rem;margin-bottom:6px}
+.live-hero-title{font-size:1rem;font-weight:700;margin-bottom:4px}
+.live-hero-sub{font-size:.78rem;color:var(--text2);line-height:1.5}
+.live-config-details{border:1px solid var(--border);border-radius:var(--radius);margin-top:10px}
+.live-config-details summary{padding:9px 12px;cursor:pointer;font-size:.78rem;color:var(--text2);list-style:none}
+.live-config-details[open] summary{border-bottom:1px solid var(--border)}
+.live-section{margin-bottom:12px}
+.live-divider{height:1px;background:var(--border);margin:14px 0}
+.live-hiker-card,.live-viewer-card{background:var(--bg3);border-radius:var(--radius);padding:12px;border:1px solid var(--border)}
+.live-hiker-status{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.live-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.live-dot-off{background:var(--text3)}
+.live-dot-live{background:var(--green);box-shadow:0 0 0 3px rgba(74,222,128,.25);animation:blink 1.4s ease-in-out infinite}
+.live-dot-stopped{background:var(--yellow)}
+.live-hiker-status-text{font-size:.85rem;font-weight:600}
+.live-hiker-hint{font-size:.73rem;color:var(--text2);margin-bottom:10px;line-height:1.4}
+.btn-live-share{width:100%;background:var(--green);color:#081a0f;border:none;border-radius:var(--radius);padding:11px;font-family:var(--sans);font-weight:700;font-size:.86rem;cursor:pointer;transition:opacity .2s}
+.btn-live-share:active{opacity:.82}
+.btn-live-share.sharing{background:var(--red);color:#fff}
+.live-viewer-empty{text-align:center;padding:14px 0;font-size:.8rem;color:var(--text2)}
+.live-viewer-empty .empty-icon{font-size:1.8rem;margin-bottom:6px}
+.live-last-update-ago{font-size:.68rem;color:var(--text3);font-family:var(--mono)}
+
+/* Hiker dot on map */
+.hiker-dot{position:relative}
+.hiker-dot-inner{width:18px;height:18px;border-radius:50%;background:var(--green);border:3px solid #fff;box-shadow:0 0 0 3px rgba(74,222,128,.3),0 2px 8px rgba(0,0,0,.5)}
+.hiker-dot-pulse{position:absolute;top:-6px;left:-6px;width:30px;height:30px;border-radius:50%;background:rgba(74,222,128,.2);animation:hikerPulse 2s ease-out infinite}
+@keyframes hikerPulse{0%{transform:scale(.7);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+
+/* Live viewer badge in topbar */
+.live-viewer-badge{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.06em}
+.live-dot-badge{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink .9s step-end infinite}
+
+/* Live FAB */
+.fab-live{border-color:var(--green)!important;color:var(--green)!important;font-size:.95rem}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+.hidden{display:none!important}
+
+/* ── Photos tab ── */
+.photo-drop-zone{border:2px dashed var(--border2);border-radius:var(--radius);padding:22px 12px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--bg3);margin-bottom:10px}
+.photo-drop-zone:hover,.photo-drop-zone.drag-over{border-color:var(--blue);background:rgba(56,189,248,.07)}
+.photo-drop-icon{font-size:1.8rem;margin-bottom:6px}
+.photo-drop-label{font-size:.8rem;color:var(--text2);line-height:1.5}
+.photo-drop-sub{font-size:.7rem;color:var(--text3);margin-top:3px}
+.photo-note-row{display:flex;gap:7px;margin-bottom:10px}
+.photo-note-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-family:var(--sans);font-size:.8rem;outline:none}
+.photo-note-input:focus{border-color:var(--blue)}
+.photo-note-input::placeholder{color:var(--text3)}
+.photo-list{display:flex;flex-direction:column;gap:6px}
+.photo-item{display:flex;align-items:center;gap:9px;background:var(--bg3);border-radius:8px;padding:8px 10px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s}
+.photo-item:hover{border-color:var(--border2)}
+.photo-thumb{width:38px;height:38px;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid var(--border2)}
+.photo-item-info{flex:1;min-width:0}
+.photo-item-name{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-item-meta{font-family:var(--mono);font-size:.66rem;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-item-note{font-size:.7rem;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo-item-actions{display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.photo-item-actions button{background:none;border:none;cursor:pointer;color:var(--text3);font-size:.75rem;padding:2px 5px;border-radius:4px;transition:color .2s}
+.photo-item-actions button:hover{color:var(--text)}
+.photo-item-actions .del-btn:hover{color:var(--red)}
+.photo-no-gps{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:9px 12px;font-size:.76rem;color:var(--yellow);margin-bottom:8px;display:none}
+.photo-marker{display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 6px rgba(0,0,0,.55))}
+.photo-marker-img{width:44px;height:44px;border-radius:8px;border:3px solid #fff;object-fit:cover;background-size:cover;background-position:center;flex-shrink:0}
+.photo-marker-tip{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:10px solid #fff;margin-top:-1px}
+
+/* ── Stats tab — enhanced ── */
+.stats-section-label{font-family:var(--mono);font-size:.63rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin:10px 0 6px}
+.stats-no-data{background:var(--bg3);border:1px dashed var(--border2);border-radius:8px;padding:10px 12px;font-size:.76rem;color:var(--text2);text-align:center;margin-bottom:8px}
+.savg-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.savg-card{background:var(--bg3);border-radius:8px;padding:9px 11px;border:1px solid var(--border)}
+.savg-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+.savg-val{font-family:var(--mono);font-size:1.05rem;color:var(--text);line-height:1.3;margin-top:1px}
+.savg-unit{font-family:var(--mono);font-size:.58rem;color:var(--text3)}
+.stotals-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:8px;padding:7px 11px;margin-bottom:4px;border:1px solid var(--border)}
+.stotals-label{font-size:.68rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.stotals-val{font-family:var(--mono);font-size:.82rem;color:var(--text)}
+.comp-block{background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);padding:11px 12px;margin-top:4px}
+.comp-route-name{font-size:.75rem;font-weight:700;color:var(--text);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.comp-progress-track{height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.comp-progress-bar{height:100%;background:linear-gradient(90deg,var(--green),#22d3ee);border-radius:4px;transition:width .5s ease;min-width:2px}
+.comp-pct-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px}
+.comp-pct-card{background:var(--bg4);border-radius:7px;padding:7px 8px;text-align:center}
+.comp-pct-label{font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text3)}
+.comp-pct-val{font-family:var(--mono);font-size:.92rem;color:var(--green);margin-top:2px}
+.comp-finish-row{border-top:1px solid var(--border);padding-top:8px;margin-top:4px;display:flex;align-items:flex-start;gap:10px}
+.comp-finish-icon{font-size:1.3rem;flex-shrink:0;margin-top:1px}
+.comp-finish-date{font-family:var(--mono);font-size:.95rem;color:var(--text);font-weight:600}
+.comp-finish-detail{font-size:.68rem;color:var(--text2);margin-top:2px;line-height:1.4}
+.sactivity-count{font-family:var(--mono);font-size:.64rem;color:var(--text3);text-align:right;margin-bottom:4px}
+
+/* ── Language selector ── */
+.lang-select{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.lang-btn{background:none;border:none;cursor:pointer;padding:2px;border-radius:4px;font-size:1.2rem;opacity:.45;transition:opacity .2s;line-height:1}
+.lang-btn:hover,.lang-btn.active{opacity:1}
+.lang-btn.active{outline:1.5px solid var(--green);border-radius:4px}
+
+/* ── Note form modal ── */
+.note-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center;padding:20px}
+.note-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;width:100%;max-width:320px;display:flex;flex-direction:column;gap:10px}
+.note-modal-title{font-size:.85rem;font-weight:700;color:var(--text)}
+.note-modal input,.note-modal textarea{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--sans);font-size:.82rem;outline:none;width:100%}
+.note-modal input:focus,.note-modal textarea:focus{border-color:var(--blue)}
+.note-modal textarea{min-height:80px;resize:vertical;line-height:1.5}
+.note-modal-btns{display:flex;gap:8px}
+.note-modal-btns button{flex:1;padding:9px;border-radius:8px;font-family:var(--sans);font-weight:700;font-size:.82rem;cursor:pointer;border:none}
+.note-modal-ok{background:var(--green);color:#081a0f}
+.note-modal-cancel{background:var(--bg4);color:var(--text2)}
+  </style>
+</head>
+<body>
+
+<!-- Splash -->
+<div id="splash" class="splash">
+  <div class="splash-inner">
+    <div class="splash-logo">
+      <img src="icon/icon.jpg" alt="P-11.50" />
+    </div>
+    <h1 class="splash-title">P-11.50</h1>
+    <p class="splash-sub">Life is GOOD!</p>
+
+    <!-- Countdown -->
+    <div class="countdown-wrap">
+      <div class="countdown-label">Start in</div>
+      <div class="countdown-grid">
+        <div class="cd-unit"><span class="cd-val" id="cdDays">--</span><span class="cd-lbl">days</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><span class="cd-val" id="cdHours">--</span><span class="cd-lbl">hrs</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><span class="cd-val" id="cdMins">--</span><span class="cd-lbl">min</span></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><span class="cd-val" id="cdSecs">--</span><span class="cd-lbl">sec</span></div>
+      </div>
+      <div class="countdown-date">16 May 2026 · 09:00</div>
+    </div>
+
+    <button id="splashEnter" class="btn-primary">Open App</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <img src="icon/icon.jpg" alt="" class="logo-img" />
+      <div class="search-wrap" id="searchWrap">
+        <input id="searchInput" class="search-input" type="search" placeholder="Search place…" autocomplete="off" />
+        <div id="searchResults" class="search-results hidden"></div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div id="liveViewerBadge" class="live-viewer-badge hidden" title="Live tracking active">
+        <span class="live-dot-badge"></span>LIVE
+      </div>
+      <div id="offRouteAlert" class="off-route-alert hidden">⚠ Off Route</div>
+      <div id="recIndicator" class="rec-indicator hidden">
+        <span class="rec-dot"></span>
+        <span id="recElapsedBadge" class="rec-time">0:00</span>
+      </div>
+      <div class="lang-select" id="langSelect">
+        <button class="lang-btn active" data-lang="en" title="English" onclick="setLang('en')">🇬🇧</button>
+        <button class="lang-btn" data-lang="es" title="Español" onclick="setLang('es')">🇪🇸</button>
+        <button class="lang-btn" data-lang="ca" title="Català" onclick="setLang('ca')" style="padding:1px 2px;line-height:1"><img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 14' width='22' height='14' style='border-radius:2px;vertical-align:middle'><rect width='22' height='14' fill='%23FFD700'/><rect y='1.75' width='22' height='1.75' fill='%23CC1010'/><rect y='5.25' width='22' height='1.75' fill='%23CC1010'/><rect y='8.75' width='22' height='1.75' fill='%23CC1010'/><rect y='12.25' width='22' height='1.75' fill='%23CC1010'/></svg>" width="22" height="14" alt="CA" style="display:block;border-radius:2px"/></button>
+      </div>
+      <div id="gpsStatus" class="gps-badge gps-off">
+        <span class="gps-dot"></span>
+        <span class="gps-label">GPS</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <div id="elevPanel" class="elev-panel hidden">
+    <div class="elev-panel-header">
+      <span class="elev-panel-title">Elevation Profile</span>
+      <span id="elevStats" class="elev-stats"></span>
+      <button id="btnCloseElev" class="elev-close">✕</button>
+    </div>
+    <div class="elev-canvas-wrap"><canvas id="elevCanvas"></canvas></div>
+  </div>
+
+  <div class="bottom-panel" id="bottomPanel">
+    <div class="drag-handle" id="dragHandle"><div class="drag-bar"></div></div>
+
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="routes">Routes</button>
+      <button class="tab-btn" data-tab="live">
+        <span class="tab-live-dot hidden" id="tabLiveDot"></span>Live
+      </button>
+      <button class="tab-btn" data-tab="pins">Stages</button>
+      <button class="tab-btn" data-tab="notes">Notes</button>
+      <button class="tab-btn" data-tab="strava">Hiker</button>
+      <button class="tab-btn" data-tab="compare">Compare</button>
+      <button class="tab-btn" data-tab="stats">Stats</button>
+      <button class="tab-btn" data-tab="photos">📷 Photos</button>
+    </div>
+
+    <!-- ROUTES -->
+    <div class="tab-pane active" id="tab-routes">
+      <div class="section-header">
+        <span class="section-label">Pre-loaded Trails</span>
+        <label class="upload-btn-small" for="gpxUpload">+ Upload GPX</label>
+        <input type="file" id="gpxUpload" accept=".gpx" hidden />
+      </div>
+      <div id="preloadedList" class="preloaded-list"></div>
+      <div id="activeRoutesSection" class="hidden">
+        <div class="section-label" style="margin-top:10px">Active on Map</div>
+        <div id="routeList" class="route-list"></div>
+      </div>
+    </div>
+
+    <!-- LIVE TRACKING -->
+    <div class="tab-pane" id="tab-live">
+
+      <!-- Hiker controls -->
+      <div class="live-section">
+        <div class="section-label">I am the hiker</div>
+        <div class="live-hiker-card" id="liveHikerCard">
+          <div class="live-hiker-status" id="liveHikerStatus">
+            <span class="live-status-dot live-dot-off"></span>
+            <span id="liveHikerStatusText">Not sharing</span>
+          </div>
+          <div class="live-hiker-hint" id="liveHikerHint">Enable GPS tracking first, then start sharing.</div>
+          <button id="btnGPS" class="btn-gps-track" style="margin-bottom:8px">📍 Track My Position</button>
+          <button id="btnLiveShare" class="btn-live-share">📡 Start Sharing Location</button>
+        </div>
+      </div>
+
+      <div class="live-divider"></div>
+
+      <!-- Viewer panel — everyone sees this -->
+      <div class="live-section">
+        <div class="section-label">Hiker position</div>
+        <div class="live-viewer-card">
+          <div id="livePosInfo">
+            <div class="info-row"><span class="info-label">Status</span><span id="liveStatus" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Last update</span><span id="liveLastUpdate" class="info-val mono">—</span></div>
+            <div class="info-row"><span class="info-label">Altitude</span><span id="liveAlt" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Speed</span><span id="liveSpeed" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Accuracy</span><span id="liveAcc" class="info-val">—</span></div>
+          </div>
+          <button id="btnJumpToHiker" class="btn-ghost" style="width:100%;margin-top:8px" disabled>🎯 Jump to hiker on map</button>
+        </div>
+      </div>
+
+    </div><!-- /tab-live -->
+    <!-- WAYPOINT -->
+    <div class="tab-pane" id="tab-pins">
+      <div id="routeWaypointsSection" class="hidden">
+        <div class="section-label">Stages</div>
+        <div id="routeWaypointList" class="waypoint-list"></div>
+      </div>
+      <div class="empty-state" id="noWaypointsMsg" style="padding:20px 0">
+        <div class="empty-icon">🗺</div>
+        <p>Load a <strong>pre-loaded route</strong> to see its stages here.</p>
+      </div>
+    </div>
+
+    <!-- NOTES -->
+    <div class="tab-pane" id="tab-notes">
+      <div class="section-header">
+        <span class="section-label">Notes</span>
+        <button id="btnAddPin" class="upload-btn-small">📌 Drop Note</button>
+      </div>
+      <div id="pinModeNote" class="pin-mode-note hidden">Tap anywhere on the map to place a note</div>
+      <div id="customPinsSection">
+        <div id="customPinList" class="waypoint-list"></div>
+        <div id="noPinsMsg" class="empty-state" style="padding:16px 0">
+          <div class="empty-icon">📝</div>
+          <p>Tap <strong>Drop Note</strong> then tap the map to add a note.</p>
+        </div>
+      </div>
+      <div id="pinExportRow" class="hidden" style="margin-top:8px">
+        <button id="btnExportPins" class="btn-ghost" style="width:100%">⬇ Export Notes (Excel)</button>
+      </div>
+    </div>
+
+    <!-- STRAVA -->
+    <div class="tab-pane" id="tab-strava">
+      <div class="strava-header">
+        <svg viewBox="0 0 40 40" fill="none" class="strava-icon">
+          <path d="M16 5 L24 22 L20 22 L28 35" stroke="#FC4C02" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div style="flex:1">
+          <div class="strava-title">Strava</div>
+          <div class="strava-sub" id="stravaAuthStatus">Not connected</div>
+        </div>
+        <img id="stravaAvatar" class="strava-avatar hidden" src="" alt="" />
+      </div>
+      <div id="stravaConnect">
+        <p class="strava-connect-desc">Connect Strava to load your real activities onto the topo map.</p>
+        <button id="btnStravaLogin" class="btn-strava">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+          Connect with Strava
+        </button>
+        <details class="strava-config-details" id="stravaConfigDetails">
+          <summary>⚙️ API Configuration</summary>
+          <div class="config-fields">
+            <div class="gh-notice">
+              <div class="gh-notice-title">📌 GitHub Pages Setup</div>
+              <div class="gh-notice-body">Deploy <code>cloudflare-worker.js</code> to Cloudflare Workers (free), then paste its URL below. <a href="README-GITHUB.md" target="_blank" class="gh-notice-link">Full instructions →</a></div>
+            </div>
+            <label class="config-label">Client ID<input id="stravaClientId" type="text" inputmode="numeric" placeholder="123456" class="config-input" /></label>
+            <label class="config-label">Client Secret<input id="stravaClientSecret" type="password" placeholder="••••••••" class="config-input" /></label>
+            <label class="config-label">Redirect URI<input id="stravaRedirectUri" type="url" class="config-input" /><span class="config-hint">Must exactly match the URL in your Strava app settings</span></label>
+            <label class="config-label">Proxy URL (Cloudflare Worker)<input id="stravaProxyUrl" type="url" placeholder="https://strava-proxy.yourname.workers.dev" class="config-input" /><span class="config-hint">Deploy cloudflare-worker.js → paste worker URL here</span></label>
+            <button id="btnSaveStravaConfig" class="btn-ghost" style="margin-top:8px;width:100%">Save &amp; Connect →</button>
+          </div>
+        </details>
+      </div>
+      <div id="stravaConnected" class="hidden">
+        <div class="panel-row" style="margin-bottom:6px">
+          <button id="btnStravaRefresh" class="btn-ghost">↻ Refresh</button>
+          <button id="btnStravaLogout" class="btn-ghost danger">Disconnect</button>
+        </div>
+        <div id="activityList" class="activity-list"></div>
+      </div>
+      <div id="stravaOverlayInfo" class="strava-overlay-info hidden">
+        <div class="section-label" style="margin-top:10px">Loaded on map</div>
+        <div class="info-row"><span class="info-label">Activity</span><span id="stravaName" class="info-val ellipsis">—</span></div>
+        <div class="info-row"><span class="info-label">Distance</span><span id="stravaDist" class="info-val">—</span></div>
+        <div class="info-row"><span class="info-label">Elev ↑</span><span id="stravaElev" class="info-val">—</span></div>
+        <div class="info-row"><span class="info-label">Time</span><span id="stravaTime" class="info-val">—</span></div>
+        <button id="btnClearStrava" class="btn-ghost danger" style="margin-top:8px;width:100%">✕ Remove overlay</button>
+      </div>
+    </div>
+
+    <!-- COMPARE -->
+    <div class="tab-pane" id="tab-compare">
+      <div id="compareEmpty" class="empty-state">
+        <div class="empty-icon">⛰</div>
+        <p>Load a <strong>GPX route</strong> and a <strong>Strava activity</strong> to compare them.</p>
+      </div>
+      <div id="comparePanel" class="hidden">
+        <div class="compare-grid">
+          <div class="compare-col"><div class="compare-col-label"><span class="dot dot-gpx"></span> GPX Route</div>
+            <div class="info-row"><span class="info-label">Distance</span><span id="cmpGpxDist" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Elev ↑</span><span id="cmpGpxElev" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Points</span><span id="cmpGpxPts" class="info-val">—</span></div>
+          </div>
+          <div class="compare-col"><div class="compare-col-label"><span class="dot dot-strava"></span> Strava</div>
+            <div class="info-row"><span class="info-label">Distance</span><span id="cmpStravaDist" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Elev ↑</span><span id="cmpStravaElev" class="info-val">—</span></div>
+            <div class="info-row"><span class="info-label">Points</span><span id="cmpStravaPts" class="info-val">—</span></div>
+          </div>
+        </div>
+        <div class="diff-row"><span class="diff-label">Δ Distance</span><span id="diffDist" class="diff-val">—</span></div>
+        <div class="diff-row"><span class="diff-label">Δ Elevation</span><span id="diffElev" class="diff-val">—</span></div>
+        <button id="btnFitBoth" class="btn-primary" style="margin-top:10px;width:100%">Fit both on map</button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="tab-pane" id="tab-stats">
+      <div class="stats-section-label">Shared Activities — Averages</div>
+      <div id="statsNoStrava" class="stats-no-data">Share Strava activities with observers to see averages here.</div>
+      <div id="stravaStatsBlock" class="hidden">
+        <div class="sactivity-count" id="sActivityCount"></div>
+        <div class="savg-grid">
+          <div class="savg-card"><div class="savg-label">Avg Distance</div><div class="savg-val" id="sAvgDist">—</div></div>
+          <div class="savg-card"><div class="savg-label">Avg Elev Gain</div><div class="savg-val" id="sAvgElev">—</div></div>
+          <div class="savg-card"><div class="savg-label">Avg Duration</div><div class="savg-val" id="sAvgTime">—</div></div>
+          <div class="savg-card"><div class="savg-label">Avg Speed</div><div class="savg-val" id="sAvgSpeed">—</div><div class="savg-unit">km/h</div></div>
+        </div>
+        <div class="stotals-row"><span class="stotals-label">Avg Pace</span><span class="stotals-val" id="sAvgPace">—</span></div>
+        <div class="stats-section-label" style="margin-top:10px">Totals (all loaded activities)</div>
+        <div class="stotals-row"><span class="stotals-label">Total Distance</span><span class="stotals-val" id="sTotalDist">—</span></div>
+        <div class="stotals-row"><span class="stotals-label">Total Elev Gain</span><span class="stotals-val" id="sTotalElev">—</span></div>
+        <div class="stotals-row"><span class="stotals-label">Total Moving Time</span><span class="stotals-val" id="sTotalTime">—</span></div>
+        <div id="completionBlock" class="hidden">
+          <div class="stats-section-label" style="margin-top:10px">Route Completion Estimate</div>
+          <div class="comp-block">
+            <div class="comp-route-name" id="compRouteName"></div>
+            <div class="comp-progress-track"><div class="comp-progress-bar" id="compProgressBar" style="width:0%"></div></div>
+            <div class="comp-pct-row">
+              <div class="comp-pct-card"><div class="comp-pct-label">Distance</div><div class="comp-pct-val" id="compPctDist">—</div></div>
+              <div class="comp-pct-card"><div class="comp-pct-label">Elevation</div><div class="comp-pct-val" id="compPctElev">—</div></div>
+              <div class="comp-pct-card"><div class="comp-pct-label">Overall</div><div class="comp-pct-val" id="compPctBlend">—</div></div>
+            </div>
+            <div class="comp-finish-row">
+              <div class="comp-finish-icon">🏁</div>
+              <div>
+                <div class="comp-finish-date" id="compFinishEst">—</div>
+                <div class="comp-finish-detail" id="compFinishDetail"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- PHOTOS -->
+    <div class="tab-pane" id="tab-photos">
+      <div id="photoNoGps" class="photo-no-gps">
+        ⚠ No GPS data found in that photo. Make sure location is enabled in your camera settings.
+      </div>
+      <div class="photo-drop-zone" id="photoDropZone">
+        <div class="photo-drop-icon">📷</div>
+        <div class="photo-drop-label"><strong>Tap to upload a photo</strong><br/>or drag &amp; drop here</div>
+        <div class="photo-drop-sub">GPS location is read from the photo's metadata</div>
+        <input type="file" id="photoInput" accept="image/*" hidden multiple />
+      </div>
+      <div class="photo-note-row">
+        <input id="photoNoteInput" class="photo-note-input" type="text"
+               placeholder="Add a note for the next photo…" maxlength="200" />
+      </div>
+      <div class="section-header" id="photoListHeader" style="display:none">
+        <span class="section-label">On Map</span>
+        <button id="btnExportPhotoGpx" class="upload-btn-small">⬇ Export GPX</button>
+      </div>
+      <div id="photoList" class="photo-list"></div>
+    </div>
+
+  </div><!-- /bottom-panel -->
+
+  <div class="fab-group" id="fabGroup">
+    <button id="btnJumpHikerFab" class="fab fab-live hidden" title="Jump to hiker">📡</button>
+    <button id="btnCenter" class="fab fab-center hidden" title="Center on position">◎</button>
+    <button id="btnTogglePhotos" class="fab hidden" title="Show/hide photos on map">📷</button>
+    <button id="btnElev"   class="fab"                   title="Elevation profile">📈</button>
+    <button id="btnLayer"  class="fab"                   title="Cycle map layer">🗻</button>
+  </div>
+
+</div><!-- /app -->
+
+<div id="toast" class="toast"></div>
+
+<script src="js/routes.js"></script>
+<script src="js/strava.js"></script>
+<script src="js/elevation.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/waypoints.js"></script>
+<script src="js/geocoder.js"></script>
+<script src="js/livetrack.js"></script>
+<script src="js/photos.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+/* ── Splash countdown to 9 May 2026 09:00 local time ── */
+(function() {
+  // Target: 9 May 2026 at 09:00 in the user's local timezone
+  const TARGET = new Date(2026, 4, 16, 9, 0, 0); // month is 0-indexed: 4 = May
+
+  const dEl = document.getElementById('cdDays');
+  const hEl = document.getElementById('cdHours');
+  const mEl = document.getElementById('cdMins');
+  const sEl = document.getElementById('cdSecs');
+  const wrap = document.querySelector('.countdown-wrap');
+
+  function pad(n) { return String(Math.max(0, n)).padStart(2, '0'); }
+
+  function tick() {
+    const diff = TARGET - Date.now();
+
+    if (diff <= 0) {
+      // Countdown finished — we've started!
+      wrap.innerHTML = '<div class="cd-done">🏔 The adventure has begun!</div>';
+      return;
+    }
+
+    const totalSec = Math.floor(diff / 1000);
+    const days  = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins  = Math.floor((totalSec % 3600) / 60);
+    const secs  = totalSec % 60;
+
+    dEl.textContent = pad(days);
+    hEl.textContent = pad(hours);
+    mEl.textContent = pad(mins);
+    sEl.textContent = pad(secs);
+  }
+
+  tick(); // run immediately so there's no blank flash
+  setInterval(tick, 1000);
+})();
+</script>
+
+<script>
+/* ── Language / i18n ── */
+const LANG = {
+  en: {
+    openApp:'Open App', searchPlace:'Search place…',
+    tabRoutes:'Routes', tabLive:'Live', tabWaypoint:'Stages',
+    tabNotes:'Notes', tabHiker:'Hiker', tabCompare:'Compare',
+    tabStats:'Stats', tabPhotos:'📷 Photos',
+    trackPos:'📍 Track My Position', startSharing:'📡 Start Sharing Location',
+    stopSharing:'⏹ Stop Sharing', dropNote:'📌 Drop Note', cancelNote:'✕ Cancel',
+    exportNotes:'⬇ Export Notes (Excel)', noNotes:'Tap Drop Note then tap the map to add a note.',
+    noWaypoints:'Load a pre-loaded route to see its stages here.',
+    uploadGpx:'+ Upload GPX', preloadedTrails:'Pre-loaded Trails',
+    activeOnMap:'Active on Map', iAmHiker:'I am the hiker', notSharing:'Not sharing',
+    enableGPSFirst:'Enable GPS tracking first, then start sharing.',
+    hikerPosition:'Hiker position', status:'STATUS', lastUpdate:'LAST UPDATE',
+    altitude:'ALTITUDE', speed:'SPEED', accuracy:'ACCURACY',
+    jumpToHiker:'🎯 Jump to hiker on map',
+    sharedActivitiesAvg:'Shared Activities — Averages',
+    connectStrava:'Share Strava activities with observers to see averages here.',
+    startIn:'Start in', lifeIsGood:'Life is GOOD!',
+  },
+  es: {
+    openApp:'Abrir App', searchPlace:'Buscar lugar…',
+    tabRoutes:'Rutas', tabLive:'En Vivo', tabWaypoint:'Etapas',
+    tabNotes:'Notas', tabHiker:'Excursionista', tabCompare:'Comparar',
+    tabStats:'Stats', tabPhotos:'📷 Fotos',
+    trackPos:'📍 Rastrear Posición', startSharing:'📡 Compartir Ubicación',
+    stopSharing:'⏹ Parar', dropNote:'📌 Añadir Nota', cancelNote:'✕ Cancelar',
+    exportNotes:'⬇ Exportar Notas (Excel)', noNotes:'Pulsa Añadir Nota y toca el mapa.',
+    noWaypoints:'Carga una ruta para ver sus etapas.',
+    uploadGpx:'+ Subir GPX', preloadedTrails:'Rutas Precargadas',
+    activeOnMap:'Activo en Mapa', iAmHiker:'Soy el excursionista', notSharing:'No compartiendo',
+    enableGPSFirst:'Activa el GPS primero, luego empieza a compartir.',
+    hikerPosition:'Posición del excursionista', status:'ESTADO', lastUpdate:'ÚLTIMA ACTUALIZACIÓN',
+    altitude:'ALTITUD', speed:'VELOCIDAD', accuracy:'PRECISIÓN',
+    jumpToHiker:'🎯 Ir al excursionista',
+    sharedActivitiesAvg:'Actividades Compartidas — Promedios',
+    connectStrava:'Comparte actividades de Strava para ver promedios.',
+    startIn:'Empieza en', lifeIsGood:'¡La vida es BUENA!',
+  },
+  ca: {
+    openApp:'Obrir App', searchPlace:'Cerca un lloc…',
+    tabRoutes:'Rutes', tabLive:'En Viu', tabWaypoint:'Etapes',
+    tabNotes:'Notes', tabHiker:'Excursionista', tabCompare:'Comparar',
+    tabStats:'Stats', tabPhotos:'📷 Fotos',
+    trackPos:'📍 Rastrejar Posició', startSharing:'📡 Compartir Ubicació',
+    stopSharing:'⏹ Parar', dropNote:'📌 Afegir Nota', cancelNote:'✕ Cancel·lar',
+    exportNotes:'⬇ Exportar Notes (Excel)', noNotes:'Prem Afegir Nota i toca el mapa.',
+    noWaypoints:"Carrega una ruta per veure les seves etapes.",
+    uploadGpx:'+ Pujar GPX', preloadedTrails:'Rutes Precàrregades',
+    activeOnMap:'Actiu al Mapa', iAmHiker:"Sóc l'excursionista", notSharing:'No compartint',
+    enableGPSFirst:'Activa el GPS primer, després comença a compartir.',
+    hikerPosition:"Posició de l'excursionista", status:'ESTAT', lastUpdate:'ÚLTIMA ACTUALITZACIÓ',
+    altitude:'ALTITUD', speed:'VELOCITAT', accuracy:'PRECISIÓ',
+    jumpToHiker:"🎯 Anar a l'excursionista",
+    sharedActivitiesAvg:'Activitats Compartides — Mitjanes',
+    connectStrava:'Comparteix activitats de Strava per veure mitjanes.',
+    startIn:'Comença en', lifeIsGood:'La vida és BONA!',
+  }
+};
+
+let _currentLang = localStorage.getItem('p1150_lang') || 'en';
+
+function setLang(lang) {
+  _currentLang = lang;
+  localStorage.setItem('p1150_lang', lang);
+  const L = LANG[lang];
+  // Update lang buttons
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+
+  // Splash
+  const sub = document.querySelector('.splash-sub');
+  if (sub) sub.textContent = L.lifeIsGood;
+  const openBtn = document.getElementById('splashEnter');
+  if (openBtn) openBtn.textContent = L.openApp;
+  const cdLabel = document.querySelector('.countdown-label');
+  if (cdLabel) cdLabel.textContent = L.startIn;
+
+  // Search
+  const si = document.getElementById('searchInput');
+  if (si) si.placeholder = L.searchPlace;
+
+  // Tab buttons
+  const tabMap = {routes:L.tabRoutes, live:L.tabLive, pins:L.tabWaypoint,
+                  notes:L.tabNotes, strava:L.tabHiker, compare:L.tabCompare,
+                  stats:L.tabStats, photos:L.tabPhotos};
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(b => {
+    if (!tabMap[b.dataset.tab]) return;
+    // Find the last text node (tab may contain a span for the live dot)
+    const nodes = [...b.childNodes];
+    const lastText = nodes.filter(n => n.nodeType === 3).pop(); // text node
+    if (lastText) { lastText.textContent = tabMap[b.dataset.tab]; }
+    else { b.textContent = tabMap[b.dataset.tab]; }
+  });
+
+  // GPS + Live buttons
+  const gpsBtn = document.getElementById('btnGPS');
+  if (gpsBtn) gpsBtn.textContent = L.trackPos;
+  const liveBtn = document.getElementById('btnLiveShare');
+  if (liveBtn && liveBtn.textContent.trim().startsWith('📡')) liveBtn.textContent = L.startSharing;
+
+  // Notes tab
+  const dropBtn = document.getElementById('btnAddPin');
+  if (dropBtn && !dropBtn.classList.contains('active')) dropBtn.textContent = L.dropNote;
+  const exportBtn = document.getElementById('btnExportPins');
+  if (exportBtn) exportBtn.textContent = L.exportNotes;
+  const noPins = document.getElementById('noPinsMsg');
+  if (noPins) noPins.querySelector('p').innerHTML = L.noNotes;
+  const noWp = document.getElementById('noWaypointsMsg');
+  if (noWp) noWp.querySelector('p').innerHTML = L.noWaypoints;
+
+  // Hiker position labels
+  const labelMap = {liveStatus: L.status, liveLastUpdate: L.lastUpdate,
+                    liveAlt: L.altitude, liveSpeed: L.speed, liveAcc: L.accuracy};
+  // Section labels
+  document.querySelectorAll('.section-label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (txt === 'I am the hiker' || txt === 'Soy el excursionista' || txt === "Sóc l'excursionista") el.textContent = L.iAmHiker;
+    if (txt === 'Hiker position' || txt === 'Posición del excursionista' || txt === "Posició de l'excursionista") el.textContent = L.hikerPosition;
+    if (txt === 'Pre-loaded Trails' || txt === 'Rutas Precargadas' || txt === 'Rutes Precàrregades') el.textContent = L.preloadedTrails;
+    if (txt === 'Active on Map' || txt === 'Activo en Mapa' || txt === 'Actiu al Mapa') el.textContent = L.activeOnMap;
+    if (txt === 'Shared Activities — Averages' || txt === 'Actividades Compartidas — Promedios' || txt === 'Activitats Compartides — Mitjanes') el.textContent = L.sharedActivitiesAvg;
+  });
+
+  // Stats no-strava msg
+  const ns = document.getElementById('statsNoStrava');
+  if (ns) ns.textContent = L.connectStrava;
+
+  // Jump to hiker
+  const jh = document.getElementById('btnJumpToHiker');
+  if (jh) jh.textContent = L.jumpToHiker;
+}
+
+// Expose globally so onclick="setLang('xx')" works
+window.setLang = setLang;
+
+// Apply after splash open (elements exist then)
+document.addEventListener('DOMContentLoaded', () => {
+  // Highlight saved lang button immediately
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === _currentLang));
+});
+
+// Re-apply full translation when app opens
+const _splashBtn = document.getElementById('splashEnter');
+if (_splashBtn) {
+  _splashBtn.addEventListener('click', () => setTimeout(() => setLang(_currentLang), 400));
+}
+</script>
+
+
+<!-- Note form modal -->
+<div id="noteModal" class="note-modal-overlay hidden">
+  <div class="note-modal">
+    <div class="note-modal-title">📍 Add Note</div>
+    <input id="noteModalName" type="text" placeholder="Title (e.g. Great viewpoint)" maxlength="100" />
+    <textarea id="noteModalText" placeholder="Write your note here…&#10;(multiple lines OK)" maxlength="500"></textarea>
+    <div class="note-modal-btns">
+      <button class="note-modal-cancel" onclick="closeNoteForm(false)">Cancel</button>
+      <button class="note-modal-ok" onclick="closeNoteForm(true)">Add Note</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ── Note form modal ── */
+var _noteFormCallback = null;
+function showNoteForm(lat, lon, cb) {
+  _noteFormCallback = cb;
+  document.getElementById('noteModalName').value = '';
+  document.getElementById('noteModalText').value = '';
+  document.getElementById('noteModal').classList.remove('hidden');
+  // Focus name field
+  setTimeout(() => document.getElementById('noteModalName').focus(), 100);
+}
+function closeNoteForm(save) {
+  const modal = document.getElementById('noteModal');
+  modal.classList.add('hidden');
+  if (save && _noteFormCallback) {
+    const name = document.getElementById('noteModalName').value.trim() || 'Note';
+    const note = document.getElementById('noteModalText').value.trim();
+    _noteFormCallback(name, note);
+  }
+  _noteFormCallback = null;
+}
+// Allow Enter on name field to move to textarea
+document.addEventListener('DOMContentLoaded', () => {
+  const nameInput = document.getElementById('noteModalName');
+  if (nameInput) {
+    nameInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('noteModalText').focus(); }
+    });
+  }
+  // Close on overlay click
+  const modal = document.getElementById('noteModal');
+  if (modal) {
+    modal.addEventListener('click', e => { if (e.target === modal) closeNoteForm(false); });
+  }
+});
+</script>
+
+</body>
+</html>

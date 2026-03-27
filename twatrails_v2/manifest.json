@@ -1,0 +1,19 @@
+{
+  "name": "P-11.50",
+  "short_name": "P-11.50",
+  "description": "GR11 Transpirenaica trail companion — GPX, GPS, Live tracking, Strava",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1923",
+  "theme_color": "#0f1923",
+  "icons": [
+    {
+      "src": "icon/icon.jpg",
+      "sizes": "any",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["navigation", "sports", "travel"]
+}
